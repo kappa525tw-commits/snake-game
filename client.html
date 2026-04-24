@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐍 多人貪食蛇遊戲</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="game-header">
+            <h1>🐍 多人貪食蛇 🫓</h1>
+            <div class="game-info">
+                <div class="player-count">玩家：<span id="playerCount">0</span></div>
+                <div class="game-id">遊戲：<span id="gameId">-</span></div>
+                <div class="my-id">你的 ID：<span id="myId">-</span></div>
+            </div>
+            <div class="controls">
+                <button id="startBtn">開始遊戲</button>
+                <button id="restartBtn">重新開始</button>
+            </div>
+        </div>
+        
+        <div class="game-container">
+            <canvas id="gameCanvas"></canvas>
+            <div id="overlay">
+                <div class="overlay-content">
+                    <h2>準備開始！</h2>
+                    <p>按 "開始遊戲" 或等待其他玩家加入</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="scoreboard">
+            <h3>🏆 排行榜</h3>
+            <div id="scoreboard" class="scoreboard-list">
+                <!-- 動態更新 -->
+            </div>
+        </div>
+        
+        <div class="player-list">
+            <h3>👥 在線玩家</h3>
+            <div id="playerList" class="player-list-content">
+                <!-- 動態更新 -->
+            </div>
+        </div>
+        
+        <div class="controls-help">
+            <h3>🎮 操作說明</h3>
+            <div class="control-items">
+                <div><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> - 移動蛇</div>
+                <div><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> - 移動蛇</div>
+                <div>吃食物成長！避免撞牆或其他蛇</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="client.js"></script>
+</body>
+</html>
