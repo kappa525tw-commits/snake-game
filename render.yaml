@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: snake-game
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: Dockerfile
+    disk:
+      name: snake-data
+      mountPath: /app/data
+      sizeGB: 1
