@@ -242,7 +242,6 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     delete snakes[ws.id];
     delete scores[ws.id];
-    delete ws;
     
     // 通知其他玩家
     wss.clients.forEach(client => {
