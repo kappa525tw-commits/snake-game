@@ -101,7 +101,7 @@ def move_snake(snake: dict) -> None:
     # 檢查邊界碰撞
     if head["x"] < 0 or head["x"] >= GRID_W or head["y"] < 0 or head["y"] >= GRID_H:
         snake["alive"] = False
-        broadcast_game_state()
+        
         return
     
     # 檢查與其他蛇的碰撞
@@ -113,14 +113,14 @@ def move_snake(snake: dict) -> None:
         for segment in s["body"]:
             if head["x"] == segment["x"] and head["y"] == segment["y"]:
                 snake["alive"] = False
-                broadcast_game_state()
+                
                 return
     
     # 檢查與自己的碰撞
     for i in range(1, len(snake["body"])):
         if head["x"] == snake["body"][i]["x"] and head["y"] == snake["body"][i]["y"]:
             snake["alive"] = False
-            broadcast_game_state()
+            
             return
     
     # 檢查與食物的碰撞
@@ -144,27 +144,30 @@ def move_snake(snake: dict) -> None:
     if not ate:
         snake["body"].pop()
     
-    broadcast_game_state()
+    
 
-def broadcast_game_state() -> None:
-    """廣播遊戲狀態給所有連線玩家"""
+async def broadcast_game_state() -> None:
     state = {
         "type": "game_state",
         "gameId": game_id,
         "gridWidth": GRID_W,
         "gridHeight": GRID_H,
-        "snakes": {pid: {"body": s["body"], "color": s["color"], "alive": s["alive"], "direction": s["direction"], "score": s["score"]} for pid, s in snakes.items()},
+        "snakes": {pid: {"body": s["body"], "color": s["color"], "alive": s["alive"],
+                         "direction": s["direction"], "score": s["score"]}
+                   for pid, s in snakes.items()},
         "foods": foods,
         "scores": scores,
         "running": game_running,
         "timestamp": int(datetime.now().timestamp() * 1000)
     }
-    
-    for client in list(connected_clients.values()):
+    dead = []
+    for pid, client in list(connected_clients.items()):
         try:
-            asyncio.create_task(client.send_text(json.dumps(state)))
+            await client.send_text(json.dumps(state))
         except:
-            pass
+            dead.append(pid)
+    for pid in dead:
+        connected_clients.pop(pid, None)
 
 async def game_loop() -> None:
     """遊戲主循環"""
@@ -176,6 +179,7 @@ async def game_loop() -> None:
         
         for snake in list(snakes.values()):
             move_snake(snake)
+        await broadcast_game_state()
         
         # 檢查是否所有蛇都死了
         alive_count = sum(1 for s in snakes.values() if s["alive"])
