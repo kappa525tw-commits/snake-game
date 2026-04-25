@@ -73,8 +73,75 @@ function connectWS(nickname) {
 }
 
 // ══════════════════════════════════════════
-//  WebSocket 訊息處理
+//  音效系統（Web Audio API，不需要任何音效檔）
 // ══════════════════════════════════════════
+let audioCtx = null;
+
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playBeep(freq = 440, duration = 0.12, type = 'sine', vol = 0.4) {
+  try {
+    const ac  = getAudio();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ac.currentTime);
+    gain.gain.setValueAtTime(vol, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + duration);
+  } catch(e) {}
+}
+
+// 倒數音效（低沉 beep）
+function playCountBeep(n) {
+  if (n === 0) {
+    // GO！— 上升音
+    playBeep(440, 0.08, 'square', 0.3);
+    setTimeout(() => playBeep(660, 0.08, 'square', 0.3), 80);
+    setTimeout(() => playBeep(880, 0.2,  'square', 0.4), 160);
+  } else {
+    // 倒數 tick
+    playBeep(220, 0.15, 'square', 0.25);
+  }
+}
+
+// 開始按鈕音效
+function playStartClick() {
+  playBeep(330, 0.06, 'square', 0.2);
+  setTimeout(() => playBeep(440, 0.1, 'square', 0.25), 60);
+}
+
+// ══════════════════════════════════════════
+//  倒數畫面
+// ══════════════════════════════════════════
+const countdownEl = document.getElementById('countdownOverlay');
+
+function showCountdown(n) {
+  if (!countdownEl) return;
+  countdownEl.style.display = 'flex';
+
+  if (n === 0) {
+    countdownEl.querySelector('.cd-num').textContent = 'GO!';
+    countdownEl.querySelector('.cd-num').style.color = '#00ff88';
+    countdownEl.querySelector('.cd-num').style.textShadow = '0 0 60px rgba(0,255,136,0.8)';
+    setTimeout(() => { countdownEl.style.display = 'none'; }, 600);
+  } else {
+    countdownEl.querySelector('.cd-num').textContent = n;
+    countdownEl.querySelector('.cd-num').style.color = '#ffb800';
+    countdownEl.querySelector('.cd-num').style.textShadow = '0 0 60px rgba(255,184,0,0.8)';
+    // 每次數字更新觸發動畫
+    const el = countdownEl.querySelector('.cd-num');
+    el.style.animation = 'none';
+    el.offsetHeight; // reflow
+    el.style.animation = 'cdPop 0.5s ease';
+  }
+}
 function onMessage(event) {
   let msg;
   try { msg = JSON.parse(event.data); } catch { return; }
@@ -94,6 +161,11 @@ function onMessage(event) {
     document.getElementById('myBadge').textContent = '🐍 ' + myNickname;
   }
 
+  if (msg.type === 'countdown') {
+    showCountdown(msg.count);
+    playCountBeep(msg.count);
+  }
+
   if (msg.type === 'game_state') {
     gameState = msg;
     render(msg);
@@ -105,11 +177,15 @@ function onMessage(event) {
 //  遊戲按鈕
 // ══════════════════════════════════════════
 document.getElementById('startBtn').addEventListener('click', () => {
-  ws && ws.send(JSON.stringify({ type: 'start' }));
+  if (!ws) return;
+  playStartClick();
+  ws.send(JSON.stringify({ type: 'start' }));
 });
 
 document.getElementById('restartBtn').addEventListener('click', () => {
-  ws && ws.send(JSON.stringify({ type: 'restart' }));
+  if (!ws) return;
+  playStartClick();
+  ws.send(JSON.stringify({ type: 'restart' }));
 });
 
 // ══════════════════════════════════════════
