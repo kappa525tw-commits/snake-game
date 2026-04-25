@@ -5,7 +5,7 @@ const path = require('path');
 const WebSocket = require('ws');
 
 const PORT = parseInt(process.env.PORT) || 3000;
-const wss = new WebSocket.Server({ port: PORT + 1 });
+const wss = new WebSocket.Server({ noServer: true });
 
 const GRID_W = 40;
 const GRID_H = 30;
@@ -181,7 +181,37 @@ setInterval(() => {
   }
 }, TICK_RATE);
 
-wss.on('connection', (ws) => {
+// HTTP 服務器
+const server = http.createServer((req, res) => {
+  if (req.url === '/' || req.url === '/index.html') {
+    fs.readFile(path.join(__dirname, 'client.html'), (err, data) => {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+  } else if (req.url === '/client.js') {
+    fs.readFile(path.join(__dirname, 'client.js'), (err, data) => {
+      res.writeHead(200, { 'Content-Type': 'application/javascript' });
+      res.end(data);
+    });
+  } else {
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+});
+
+// 升級 WebSocket 連線
+server.on('upgrade', (req, socket, head) => {
+  if (req.url === '/ws') {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  } else {
+    socket.destroy();
+  }
+});
+
+// WebSocket 連線處理
+wss.on('connection', (ws, req) => {
   ws.id = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
   
   const snake = createSnake(ws.id);
@@ -262,27 +292,9 @@ wss.on('connection', (ws) => {
   });
 });
 
-// 創建 HTTP 服務器
-const httpServer = http.createServer((req, res) => {
-  if (req.url === '/') {
-    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(data);
-    });
-  } else if (req.url === '/style.css') {
-    fs.readFile(path.join(__dirname, 'style.css'), (err, data) => {
-      res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8' });
-      res.end(data);
-    });
-  } else {
-    res.writeHead(404);
-    res.end('Not Found');
-  }
-});
-
 // 啟動服務器
-httpServer.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🐍 多人貪食蛇遊戲在 http://localhost:${PORT}`);
-  console.log(`📡 WebSocket 伺服器在 ws://localhost:${PORT + 1}`);
+  console.log(`📡 WebSocket 伺服器在 ws://localhost:${PORT}/ws`);
   console.log('🫓 打開瀏覽器並多開幾個標籤頁來測試多人遊戲！');
 });

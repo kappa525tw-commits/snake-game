@@ -26,7 +26,10 @@ let animationId = null;
 
 // 連線
 function connect() {
-  ws = new WebSocket(`ws://${location.host}:${parseInt(location.port) + 1 || 3001}`);
+  const host = location.host;
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const port = 443; // Render 免費方案使用 443 端口
+  ws = new WebSocket(`${protocol}//${host}`);
   
   ws.onopen = () => {
     console.log('Connected!');
