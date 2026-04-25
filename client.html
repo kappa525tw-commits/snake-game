@@ -2,177 +2,172 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🐍 多人貪食蛇遊戲</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🐍 多人貪食蛇</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: #1a1a2e;
-    color: #e0e0f0;
+  :root {
+    --green: #00ff88;
+    --amber: #ffb800;
+    --red:   #ff4455;
+    --bg:    #1a1a2e;
+    --surf:  #12121f;
+    --surf2: #1e1e30;
+    --dim:   #4a6058;
+    --text:  #e0e0f0;
+    --border: rgba(255,255,255,0.07);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
     font-family: 'Segoe UI', sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    touch-action: none;
   }
 
-  /* ── 進入畫面 ── */
+  /* ════════════════════════════
+     LOBBY
+  ════════════════════════════ */
   #lobby {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
+    height: 100vh;
     width: 100%;
     background: radial-gradient(ellipse at 50% 40%, rgba(0,255,136,0.07) 0%, transparent 70%);
   }
   .lobby-box {
-    background: #12121f;
+    background: var(--surf);
     border: 1px solid rgba(0,255,136,0.15);
-    border-radius: 12px;
-    padding: 40px 48px;
-    width: 380px;
-    max-width: 95vw;
+    border-radius: 16px;
+    padding: 36px 40px;
+    width: min(400px, 92vw);
     text-align: center;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
   }
   .lobby-title {
-    font-size: 36px;
-    margin-bottom: 6px;
+    font-size: clamp(28px, 8vw, 40px);
+    color: var(--green);
+    margin-bottom: 4px;
     letter-spacing: 2px;
-    color: #00ff88;
-    text-shadow: 0 0 30px rgba(0,255,136,0.5);
     animation: glow 3s ease-in-out infinite;
   }
   @keyframes glow {
     0%,100% { text-shadow: 0 0 20px rgba(0,255,136,0.4); }
-    50%      { text-shadow: 0 0 50px rgba(0,255,136,0.9), 0 0 80px rgba(0,255,136,0.3); }
+    50%      { text-shadow: 0 0 50px rgba(0,255,136,0.9), 0 0 80px rgba(0,255,136,0.2); }
   }
-  .lobby-sub { font-size: 12px; color: #4a6058; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 32px; }
-  .lobby-label { font-size: 12px; color: #4a6058; letter-spacing: 2px; text-transform: uppercase; text-align: left; margin-bottom: 8px; }
+  .lobby-sub { font-size: 11px; color: var(--dim); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 28px; }
+  .lobby-label { font-size: 11px; color: var(--dim); letter-spacing: 2px; text-transform: uppercase; text-align: left; margin-bottom: 8px; }
   .lobby-input {
-    width: 100%; height: 48px;
-    background: #1a1a2e;
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    color: #e0e0f0;
-    font-size: 16px;
+    width: 100%; height: 50px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 17px;
     padding: 0 16px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
   }
-  .lobby-input:focus {
-    border-color: rgba(0,255,136,0.5);
-    box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
-  }
+  .lobby-input:focus { border-color: rgba(0,255,136,0.5); box-shadow: 0 0 0 3px rgba(0,255,136,0.1); }
   .lobby-input::placeholder { color: #2a3a30; }
   .lobby-btn {
-    width: 100%; height: 52px;
-    background: #00ff88;
+    width: 100%; height: 54px;
+    background: var(--green);
     color: #050a08;
-    border: none;
-    border-radius: 6px;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    letter-spacing: 1px;
+    border: none; border-radius: 8px;
+    font-size: 16px; font-weight: 700;
+    cursor: pointer; letter-spacing: 1px;
     transition: all 0.2s;
     box-shadow: 0 4px 20px rgba(0,255,136,0.3);
   }
-  .lobby-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,255,136,0.5); }
-  .lobby-btn:active { transform: translateY(0); }
-  .lobby-hint { margin-top: 20px; font-size: 12px; color: #2a3a30; line-height: 2; }
-  .lobby-err { color: #ff4455; font-size: 13px; margin-top: 10px; min-height: 18px; }
+  .lobby-btn:active { transform: scale(0.97); }
+  .lobby-err { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 18px; }
+  .lobby-hint { margin-top: 18px; font-size: 12px; color: var(--dim); line-height: 2; }
+  .lobby-hint kbd {
+    background: var(--surf2); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1px 6px; font-size: 10px; color: var(--text);
+  }
+  /* 手機大廳 hint 只顯示觸控提示 */
+  .hint-pc  { display: inline; }
+  .hint-mob { display: none; }
 
-  /* ── 遊戲畫面 ── */
-  #game { display: none; flex-direction: column; align-items: center; width: 100%; padding: 12px; }
-
-  .game-header {
-    display: flex;
+  /* ════════════════════════════
+     GAME — PC 佈局
+  ════════════════════════════ */
+  #game {
+    display: none;
+    width: 100vw; height: 100vh;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    max-width: 1100px;
-    padding: 10px 0;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-    gap: 8px;
+    overflow: hidden;
   }
-  .game-title { font-size: 20px; color: #00ff88; font-weight: 700; letter-spacing: 1px; }
-  .game-info { display: flex; gap: 16px; font-size: 12px; color: #4a6058; align-items: center; flex-wrap: wrap; }
-  .game-info span { color: #e0e0f0; font-weight: 600; }
-  .my-badge {
-    background: rgba(0,255,136,0.1);
-    border: 1px solid rgba(0,255,136,0.3);
-    border-radius: 20px;
-    padding: 4px 14px;
-    font-size: 13px;
-    color: #00ff88;
-    font-weight: 700;
-  }
-  .controls { display: flex; gap: 8px; }
-  .ctrl-btn {
-    height: 36px; padding: 0 18px;
-    border: 1px solid rgba(0,255,136,0.3);
-    background: none; color: #00ff88;
-    border-radius: 4px; font-size: 13px;
-    cursor: pointer; transition: all 0.15s;
-    font-family: inherit;
-  }
-  .ctrl-btn:hover { background: rgba(0,255,136,0.1); }
-  .ctrl-btn.primary { background: #00ff88; color: #050a08; font-weight: 700; border-color: #00ff88; }
-  .ctrl-btn.primary:hover { background: #00cc6a; }
 
+  /* Header */
+  .game-header {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    width: 100%; padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0; flex-wrap: wrap; gap: 6px;
+    background: rgba(18,18,31,0.95);
+    z-index: 10;
+  }
+  .game-title { font-size: 18px; color: var(--green); font-weight: 700; letter-spacing: 1px; }
+  .game-info  { display: flex; gap: 12px; font-size: 12px; color: var(--dim); align-items: center; flex-wrap: wrap; }
+  .game-info span { color: var(--text); font-weight: 600; }
+  .my-badge {
+    background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 20px; padding: 3px 12px; font-size: 12px;
+    color: var(--green); font-weight: 700;
+  }
+  .controls { display: flex; gap: 6px; }
+  .ctrl-btn {
+    height: 34px; padding: 0 14px;
+    border: 1px solid rgba(0,255,136,0.3);
+    background: none; color: var(--green);
+    border-radius: 4px; font-size: 12px;
+    cursor: pointer; transition: all 0.15s;
+    font-family: inherit; white-space: nowrap;
+  }
+  .ctrl-btn:active { transform: scale(0.95); }
+  .ctrl-btn.primary { background: var(--green); color: #050a08; font-weight: 700; border-color: var(--green); }
+
+  /* Main area */
   .game-body {
-    display: flex;
-    gap: 16px;
+    display: flex; flex: 1;
+    gap: 12px; padding: 10px;
     align-items: flex-start;
-    max-width: 1100px;
-    width: 100%;
+    overflow: hidden; width: 100%;
   }
 
   /* Canvas */
   .canvas-wrap { position: relative; flex-shrink: 0; }
-  canvas { display: block; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
-  #overlay {
+  #gameCanvas { display: block; border-radius: 6px; border: 1px solid var(--border); }
+
+  /* Overlays on canvas */
+  .c-overlay {
     position: absolute; inset: 0;
-    background: rgba(10,10,20,0.82);
     display: flex; align-items: center; justify-content: center;
     flex-direction: column; gap: 10px;
     border-radius: 6px; backdrop-filter: blur(4px);
-  }
-  #overlay h2 { color: #00ff88; font-size: 22px; }
-  #overlay p  { color: #4a6058; font-size: 13px; letter-spacing: 1px; }
-
-  /* Side panel */
-  .side { display: flex; flex-direction: column; gap: 12px; width: 200px; flex-shrink: 0; }
-  .panel {
-    background: #12121f;
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px;
-    padding: 14px;
-  }
-  .panel h3 { font-size: 10px; letter-spacing: 2px; color: #4a6058; text-transform: uppercase; margin-bottom: 10px; }
-  #scoreboard div, #playerList div { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; }
-  #scoreboard div:last-child, #playerList div:last-child { border-bottom: none; }
-  .ctrl-help { font-size: 11px; color: #4a6058; line-height: 2.2; }
-  /* 倒數 overlay */
-  #countdownOverlay {
-    display: none;
-    position: absolute; inset: 0;
-    background: rgba(10,10,20,0.75);
-    align-items: center; justify-content: center;
-    border-radius: 6px;
-    backdrop-filter: blur(3px);
-    z-index: 50;
     pointer-events: none;
   }
+  #overlay { background: rgba(10,10,20,0.82); }
+  #overlay h2 { color: var(--green); font-size: clamp(16px,3vw,22px); }
+  #overlay p  { color: var(--dim); font-size: 13px; letter-spacing: 1px; }
+  #countdownOverlay {
+    display: none;
+    background: rgba(10,10,20,0.75);
+    z-index: 50;
+  }
   .cd-num {
-    font-size: 160px;
+    font-size: clamp(80px, 20vw, 160px);
     font-weight: 900;
-    font-family: 'Segoe UI', sans-serif;
-    color: #ffb800;
+    color: var(--amber);
     line-height: 1;
     text-shadow: 0 0 60px rgba(255,184,0,0.8);
     animation: cdPop 0.5s ease;
@@ -184,81 +179,172 @@
     70%  { transform: scale(1.05); }
     100% { transform: scale(1); }
   }
+
+  /* Side panel (PC only) */
+  .side {
+    display: flex; flex-direction: column;
+    gap: 10px; width: 190px; flex-shrink: 0;
+    max-height: 100%; overflow-y: auto;
+  }
+  .panel {
+    background: var(--surf);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px;
+    flex-shrink: 0;
+  }
+  .panel h3 { font-size: 9px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; margin-bottom: 8px; }
+  .ctrl-help { font-size: 11px; color: var(--dim); line-height: 2.2; }
+  .ctrl-help kbd {
+    background: var(--surf2); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1px 5px; font-size: 9px; color: var(--text);
+  }
+
+  /* ════════════════════════════
+     MOBILE 佈局覆蓋
+  ════════════════════════════ */
+  body.is-mobile {
+    overflow: hidden;
+  }
+  body.is-mobile .hint-pc  { display: none; }
+  body.is-mobile .hint-mob { display: inline; }
+  body.is-mobile .side     { display: none; }   /* 隱藏側欄 */
+  body.is-mobile .game-body { padding: 0; gap: 0; }
+  body.is-mobile .canvas-wrap { width: 100%; }
+  body.is-mobile #gameCanvas { width: 100% !important; height: auto !important; border-radius: 0; border: none; }
+
+  /* 手機底部 HUD 行 */
+  #mob-hud {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    z-index: 30;
+    flex-direction: column;
+    pointer-events: none;
+  }
+  body.is-mobile #mob-hud { display: flex; }
+
+  /* 手機分數條 */
+  #mob-scorebar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 12px;
+    background: rgba(12,12,20,0.9);
+    font-size: 11px; color: var(--dim);
+    border-top: 1px solid var(--border);
+    overflow-x: auto; white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* 虛擬搖桿區 */
+  #dpad {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3px;
+    padding: 8px 12px 12px;
+    background: rgba(12,12,20,0.88);
+    pointer-events: all;
+  }
+  .dpad-btn {
+    height: 52px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+    -webkit-user-select: none;
+  }
+  .dpad-btn:active, .dpad-btn.pressed { background: rgba(0,255,136,0.18); border-color: rgba(0,255,136,0.4); }
+  .dpad-up    { grid-column: 2; grid-row: 1; }
+  .dpad-left  { grid-column: 1; grid-row: 2; }
+  .dpad-down  { grid-column: 2; grid-row: 2; }
+  .dpad-right { grid-column: 3; grid-row: 2; }
+
+  /* 手機 header 更緊湊 */
+  body.is-mobile .game-title  { font-size: 15px; }
+  body.is-mobile .game-header { padding: 6px 10px; }
+  body.is-mobile .ctrl-btn    { height: 30px; padding: 0 10px; font-size: 11px; }
+  body.is-mobile .my-badge    { font-size: 11px; padding: 2px 10px; }
 </style>
 </head>
 <body>
 
-<!-- ══ 進入大廳 ══ -->
+<!-- ══ LOBBY ══ -->
 <div id="lobby">
   <div class="lobby-box">
     <div class="lobby-title">🐍 SNAKE</div>
     <div class="lobby-sub">多人連線對戰</div>
 
     <div class="lobby-label">你的暱稱</div>
-    <input
-      class="lobby-input"
-      id="nicknameInput"
-      type="text"
-      placeholder="輸入暱稱（最多 12 字）"
-      maxlength="12"
-      autocomplete="off"
-    >
+    <input class="lobby-input" id="nicknameInput" type="text"
+      placeholder="輸入暱稱（最多 12 字）" maxlength="12" autocomplete="off">
 
     <button class="lobby-btn" id="joinBtn">進入遊戲</button>
     <div class="lobby-err" id="lobbyErr"></div>
 
     <div class="lobby-hint">
-      方向鍵 / WASD 控制蛇<br>
+      <span class="hint-pc">方向鍵 / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 控制蛇</span>
+      <span class="hint-mob">📱 觸控搖桿操控蛇</span><br>
       進入後等待房主按開始
     </div>
   </div>
 </div>
 
-<!-- ══ 遊戲主畫面 ══ -->
+<!-- ══ GAME ══ -->
 <div id="game">
   <div class="game-header">
-    <div class="game-title">🐍 多人貪食蛇</div>
+    <div class="game-title">🐍 貪食蛇</div>
     <div class="game-info">
-      玩家：<span id="playerCount">0</span>　
-      遊戲：<span id="gameId">-</span>　
+      玩家：<span id="playerCount">0</span>
       <div class="my-badge" id="myBadge">-</div>
     </div>
     <div class="controls">
-      <button class="ctrl-btn primary" id="startBtn">▶ 開始遊戲</button>
-      <button class="ctrl-btn" id="restartBtn">↺ 重新開始</button>
+      <button class="ctrl-btn primary" id="startBtn">▶ 開始</button>
+      <button class="ctrl-btn" id="restartBtn">↺ 重開</button>
     </div>
   </div>
 
   <div class="game-body">
     <div class="canvas-wrap">
       <canvas id="gameCanvas"></canvas>
-      <!-- 倒數 Overlay -->
-      <div id="countdownOverlay">
+      <div id="countdownOverlay" class="c-overlay">
         <div class="cd-num">5</div>
       </div>
-      <div id="overlay">
+      <div id="overlay" class="c-overlay">
         <h2>準備開始！</h2>
-        <p>按「開始遊戲」或等待房主</p>
+        <p>按「開始」或等待房主</p>
       </div>
     </div>
 
+    <!-- PC 側欄 -->
     <div class="side">
       <div class="panel">
         <h3>🏆 排行榜</h3>
         <div id="scoreboard"></div>
       </div>
       <div class="panel">
-        <h3>👥 在線玩家</h3>
+        <h3>👥 玩家</h3>
         <div id="playerList"></div>
       </div>
       <div class="panel">
         <h3>🎮 操作</h3>
         <div class="ctrl-help">
-          <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 移動<br>
-          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動
+          <kbd>↑↓←→</kbd> / <kbd>WASD</kbd> 移動
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ══ 手機 HUD（底部分數 + 搖桿） ══ -->
+<div id="mob-hud">
+  <div id="mob-scorebar"></div>
+  <div id="dpad">
+    <div class="dpad-btn dpad-up"    data-dir="up">▲</div>
+    <div class="dpad-btn dpad-left"  data-dir="left">◀</div>
+    <div class="dpad-btn dpad-down"  data-dir="down">▼</div>
+    <div class="dpad-btn dpad-right" data-dir="right">▶</div>
   </div>
 </div>
 
