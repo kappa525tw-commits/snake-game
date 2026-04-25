@@ -1,60 +1,240 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐍 多人貪食蛇遊戲</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐍 多人貪食蛇遊戲</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    color: #e0e0f0;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── 進入畫面 ── */
+  #lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100%;
+    background: radial-gradient(ellipse at 50% 40%, rgba(0,255,136,0.07) 0%, transparent 70%);
+  }
+  .lobby-box {
+    background: #12121f;
+    border: 1px solid rgba(0,255,136,0.15);
+    border-radius: 12px;
+    padding: 40px 48px;
+    width: 380px;
+    max-width: 95vw;
+    text-align: center;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  }
+  .lobby-title {
+    font-size: 36px;
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+    color: #00ff88;
+    text-shadow: 0 0 30px rgba(0,255,136,0.5);
+    animation: glow 3s ease-in-out infinite;
+  }
+  @keyframes glow {
+    0%,100% { text-shadow: 0 0 20px rgba(0,255,136,0.4); }
+    50%      { text-shadow: 0 0 50px rgba(0,255,136,0.9), 0 0 80px rgba(0,255,136,0.3); }
+  }
+  .lobby-sub { font-size: 12px; color: #4a6058; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 32px; }
+  .lobby-label { font-size: 12px; color: #4a6058; letter-spacing: 2px; text-transform: uppercase; text-align: left; margin-bottom: 8px; }
+  .lobby-input {
+    width: 100%; height: 48px;
+    background: #1a1a2e;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: #e0e0f0;
+    font-size: 16px;
+    padding: 0 16px;
+    margin-bottom: 20px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .lobby-input:focus {
+    border-color: rgba(0,255,136,0.5);
+    box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
+  }
+  .lobby-input::placeholder { color: #2a3a30; }
+  .lobby-btn {
+    width: 100%; height: 52px;
+    background: #00ff88;
+    color: #050a08;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(0,255,136,0.3);
+  }
+  .lobby-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,255,136,0.5); }
+  .lobby-btn:active { transform: translateY(0); }
+  .lobby-hint { margin-top: 20px; font-size: 12px; color: #2a3a30; line-height: 2; }
+  .lobby-err { color: #ff4455; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+  /* ── 遊戲畫面 ── */
+  #game { display: none; flex-direction: column; align-items: center; width: 100%; padding: 12px; }
+
+  .game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 1100px;
+    padding: 10px 0;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .game-title { font-size: 20px; color: #00ff88; font-weight: 700; letter-spacing: 1px; }
+  .game-info { display: flex; gap: 16px; font-size: 12px; color: #4a6058; align-items: center; flex-wrap: wrap; }
+  .game-info span { color: #e0e0f0; font-weight: 600; }
+  .my-badge {
+    background: rgba(0,255,136,0.1);
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+    color: #00ff88;
+    font-weight: 700;
+  }
+  .controls { display: flex; gap: 8px; }
+  .ctrl-btn {
+    height: 36px; padding: 0 18px;
+    border: 1px solid rgba(0,255,136,0.3);
+    background: none; color: #00ff88;
+    border-radius: 4px; font-size: 13px;
+    cursor: pointer; transition: all 0.15s;
+    font-family: inherit;
+  }
+  .ctrl-btn:hover { background: rgba(0,255,136,0.1); }
+  .ctrl-btn.primary { background: #00ff88; color: #050a08; font-weight: 700; border-color: #00ff88; }
+  .ctrl-btn.primary:hover { background: #00cc6a; }
+
+  .game-body {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    max-width: 1100px;
+    width: 100%;
+  }
+
+  /* Canvas */
+  .canvas-wrap { position: relative; flex-shrink: 0; }
+  canvas { display: block; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
+  #overlay {
+    position: absolute; inset: 0;
+    background: rgba(10,10,20,0.82);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px;
+    border-radius: 6px; backdrop-filter: blur(4px);
+  }
+  #overlay h2 { color: #00ff88; font-size: 22px; }
+  #overlay p  { color: #4a6058; font-size: 13px; letter-spacing: 1px; }
+
+  /* Side panel */
+  .side { display: flex; flex-direction: column; gap: 12px; width: 200px; flex-shrink: 0; }
+  .panel {
+    background: #12121f;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .panel h3 { font-size: 10px; letter-spacing: 2px; color: #4a6058; text-transform: uppercase; margin-bottom: 10px; }
+  #scoreboard div, #playerList div { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; }
+  #scoreboard div:last-child, #playerList div:last-child { border-bottom: none; }
+  .ctrl-help { font-size: 11px; color: #4a6058; line-height: 2.2; }
+  kbd {
+    background: #1a1a2e; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 3px; padding: 1px 6px; font-size: 10px; color: #e0e0f0;
+  }
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="game-header">
-            <h1>🐍 多人貪食蛇 🫓</h1>
-            <div class="game-info">
-                <div class="player-count">玩家：<span id="playerCount">0</span></div>
-                <div class="game-id">遊戲：<span id="gameId">-</span></div>
-                <div class="my-id">你的 ID：<span id="myId">-</span></div>
-            </div>
-            <div class="controls">
-                <button id="startBtn">開始遊戲</button>
-                <button id="restartBtn">重新開始</button>
-            </div>
-        </div>
-        
-        <div class="game-container">
-            <canvas id="gameCanvas"></canvas>
-            <div id="overlay">
-                <div class="overlay-content">
-                    <h2>準備開始！</h2>
-                    <p>按 "開始遊戲" 或等待其他玩家加入</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="scoreboard">
-            <h3>🏆 排行榜</h3>
-            <div id="scoreboard" class="scoreboard-list">
-                <!-- 動態更新 -->
-            </div>
-        </div>
-        
-        <div class="player-list">
-            <h3>👥 在線玩家</h3>
-            <div id="playerList" class="player-list-content">
-                <!-- 動態更新 -->
-            </div>
-        </div>
-        
-        <div class="controls-help">
-            <h3>🎮 操作說明</h3>
-            <div class="control-items">
-                <div><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> - 移動蛇</div>
-                <div><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> - 移動蛇</div>
-                <div>吃食物成長！避免撞牆或其他蛇</div>
-            </div>
-        </div>
+
+<!-- ══ 進入大廳 ══ -->
+<div id="lobby">
+  <div class="lobby-box">
+    <div class="lobby-title">🐍 SNAKE</div>
+    <div class="lobby-sub">多人連線對戰</div>
+
+    <div class="lobby-label">你的暱稱</div>
+    <input
+      class="lobby-input"
+      id="nicknameInput"
+      type="text"
+      placeholder="輸入暱稱（最多 12 字）"
+      maxlength="12"
+      autocomplete="off"
+    >
+
+    <button class="lobby-btn" id="joinBtn">進入遊戲</button>
+    <div class="lobby-err" id="lobbyErr"></div>
+
+    <div class="lobby-hint">
+      方向鍵 / WASD 控制蛇<br>
+      進入後等待房主按開始
+    </div>
+  </div>
+</div>
+
+<!-- ══ 遊戲主畫面 ══ -->
+<div id="game">
+  <div class="game-header">
+    <div class="game-title">🐍 多人貪食蛇</div>
+    <div class="game-info">
+      玩家：<span id="playerCount">0</span>　
+      遊戲：<span id="gameId">-</span>　
+      <div class="my-badge" id="myBadge">-</div>
+    </div>
+    <div class="controls">
+      <button class="ctrl-btn primary" id="startBtn">▶ 開始遊戲</button>
+      <button class="ctrl-btn" id="restartBtn">↺ 重新開始</button>
+    </div>
+  </div>
+
+  <div class="game-body">
+    <div class="canvas-wrap">
+      <canvas id="gameCanvas"></canvas>
+      <div id="overlay">
+        <h2>準備開始！</h2>
+        <p>按「開始遊戲」或等待房主</p>
+      </div>
     </div>
 
-    <script src="client.js"></script>
+    <div class="side">
+      <div class="panel">
+        <h3>🏆 排行榜</h3>
+        <div id="scoreboard"></div>
+      </div>
+      <div class="panel">
+        <h3>👥 在線玩家</h3>
+        <div id="playerList"></div>
+      </div>
+      <div class="panel">
+        <h3>🎮 操作</h3>
+        <div class="ctrl-help">
+          <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 移動<br>
+          <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="client.js"></script>
 </body>
 </html>
