@@ -183,6 +183,27 @@ def move_snake(snake: dict):
     if not ate:
         snake["body"].pop()
 
+async def run_countdown():
+    """倒數 5 秒後才真正開始遊戲"""
+    global game_running
+    for i in range(5, 0, -1):
+        msg = json.dumps({"type": "countdown", "count": i})
+        for client in list(connected_clients.values()):
+            try:
+                await client.send_text(msg)
+            except Exception:
+                pass
+        await asyncio.sleep(1)
+    # 倒數結束，正式開始
+    game_running = True
+    go_msg = json.dumps({"type": "countdown", "count": 0})
+    for client in list(connected_clients.values()):
+        try:
+            await client.send_text(go_msg)
+        except Exception:
+            pass
+    await broadcast_game_state()
+
 async def broadcast_game_state():
     if not connected_clients:
         return
@@ -290,8 +311,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             elif msg_type == "start":
                 if not game_running:
-                    game_running = True
-                    # 重置所有蛇
+                    # 重置所有蛇，但先不開始跑
                     for pid, s in snakes.items():
                         new_snake = create_snake(pid)
                         s.update(new_snake)
@@ -299,7 +319,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     foods.clear()
                     spawn_food(6)
                     game_id += 1
-                    await broadcast_game_state()
+                    # 廣播倒數開始
+                    asyncio.create_task(run_countdown())
 
             elif msg_type == "restart":
                 snake["alive"] = True
