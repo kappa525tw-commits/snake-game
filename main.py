@@ -261,25 +261,29 @@ async def handle_websocket(websocket: WebSocket) -> None:
             game_running = False
             broadcast_game_state()
 
+# 改後
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 @app.get("/")
 async def index():
-    return FileResponse("/home/lingyi/.openclaw/workspace/projects/snake-game/client.html")
+    return FileResponse(os.path.join(BASE_DIR, "client.html"))
 
 @app.get("/client.js")
 async def client_js():
-    return FileResponse("/home/lingyi/.openclaw/workspace/projects/snake-game/client.js")
+    return FileResponse(os.path.join(BASE_DIR, "client.js"))
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await handle_websocket(websocket)
 
+# 改後
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(game_loop())
+
 if __name__ == "__main__":
     import uvicorn
     import os
-    
-    port = int(os.environ.get("PORT", 3000))
-    
-    # 啟動遊戲循環
-    asyncio.create_task(game_loop())
-    
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
