@@ -7,3 +7,4 @@ services:
     dockerfilePath: Dockerfile
     buildCommand: docker build -t snake-game .
     startCommand: docker run -p 10000:10000 snake-game
+    healthCheckPath: /
