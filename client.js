@@ -1,23 +1,66 @@
 // ══════════════════════════════════════════
 //  多人貪食蛇 - client.js
+//  支援 PC（鍵盤）與手機（D-Pad + 滑動）
 // ══════════════════════════════════════════
 
+// ── 裝置偵測 ──
+const IS_MOBILE = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+
+if (IS_MOBILE) document.body.classList.add('is-mobile');
+
+// ── Canvas ──
 const canvas = document.getElementById('gameCanvas');
 const ctx    = canvas.getContext('2d');
 
-let GRID_W = 40;
-let GRID_H = 30;
-const CELL = 18;
-
-canvas.width  = GRID_W * CELL;
-canvas.height = GRID_H * CELL;
+let GRID_W = 30;   // 手機格子數較少，PC 為 40（welcome 後會更新）
+let GRID_H = 22;
+let CELL   = 18;
 
 // ── 狀態 ──
-let ws          = null;
-let myId        = null;
-let myNickname  = '';
-let gameState   = null;
-let joined      = false;
+let ws         = null;
+let myId       = null;
+let myNickname = '';
+let gameState  = null;
+let joined     = false;
+
+// ══════════════════════════════════════════
+//  響應式 Canvas 尺寸
+// ══════════════════════════════════════════
+function resizeCanvas() {
+  if (!joined) return;
+
+  if (IS_MOBILE) {
+    // 手機：寬度 = 全螢幕寬，高度扣掉 header + hud
+    const headerH = document.querySelector('.game-header')?.offsetHeight || 46;
+    const dpadH   = document.getElementById('dpad')?.offsetHeight || 120;
+    const scoreH  = document.getElementById('mob-scorebar')?.offsetHeight || 28;
+    const availW  = window.innerWidth;
+    const availH  = window.innerHeight - headerH - dpadH - scoreH - 4;
+
+    const cellByW = Math.floor(availW / GRID_W);
+    const cellByH = Math.floor(availH / GRID_H);
+    CELL = Math.max(8, Math.min(cellByW, cellByH));
+  } else {
+    // PC：扣掉 header + side panel + padding
+    const headerH = document.querySelector('.game-header')?.offsetHeight || 50;
+    const sideW   = 202;
+    const pad     = 32;
+    const availW  = window.innerWidth  - sideW - pad;
+    const availH  = window.innerHeight - headerH - pad;
+
+    const cellByW = Math.floor(availW / GRID_W);
+    const cellByH = Math.floor(availH / GRID_H);
+    CELL = Math.max(10, Math.min(cellByW, cellByH));
+  }
+
+  canvas.width  = GRID_W * CELL;
+  canvas.height = GRID_H * CELL;
+  if (gameState) render(gameState);
+}
+
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 300));
 
 // ══════════════════════════════════════════
 //  大廳邏輯
@@ -26,19 +69,12 @@ const nicknameInput = document.getElementById('nicknameInput');
 const joinBtn       = document.getElementById('joinBtn');
 const lobbyErr      = document.getElementById('lobbyErr');
 
-// Enter 直接加入
-nicknameInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') joinGame();
-});
+nicknameInput.addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
 joinBtn.addEventListener('click', joinGame);
 
 function joinGame() {
   const name = nicknameInput.value.trim();
-  if (!name) {
-    lobbyErr.textContent = '請輸入暱稱！';
-    nicknameInput.focus();
-    return;
-  }
+  if (!name) { lobbyErr.textContent = '請輸入暱稱！'; nicknameInput.focus(); return; }
   lobbyErr.textContent = '';
   joinBtn.disabled = true;
   joinBtn.textContent = '連線中...';
@@ -51,10 +87,8 @@ function connectWS(nickname) {
   ws = new WebSocket(`${proto}//${location.host}/ws`);
 
   ws.addEventListener('open', () => {
-    // 連線後立刻送暱稱
     ws.send(JSON.stringify({ type: 'set_nickname', nickname }));
   });
-
   ws.addEventListener('close', () => {
     if (!joined) {
       lobbyErr.textContent = '無法連線伺服器，請重試';
@@ -62,56 +96,44 @@ function connectWS(nickname) {
       joinBtn.textContent = '進入遊戲';
     }
   });
-
   ws.addEventListener('error', () => {
-    lobbyErr.textContent = '連線錯誤，請確認伺服器是否正常運作';
+    lobbyErr.textContent = '連線錯誤';
     joinBtn.disabled = false;
     joinBtn.textContent = '進入遊戲';
   });
-
   ws.addEventListener('message', onMessage);
 }
 
 // ══════════════════════════════════════════
-//  音效系統（Web Audio API，不需要任何音效檔）
+//  音效（Web Audio API）
 // ══════════════════════════════════════════
 let audioCtx = null;
-
 function getAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
-
-function playBeep(freq = 440, duration = 0.12, type = 'sine', vol = 0.4) {
+function playBeep(freq = 440, duration = 0.12, type = 'sine', vol = 0.3) {
   try {
-    const ac  = getAudio();
+    const ac = getAudio();
     const osc = ac.createOscillator();
     const gain = ac.createGain();
-    osc.connect(gain);
-    gain.connect(ac.destination);
+    osc.connect(gain); gain.connect(ac.destination);
     osc.type = type;
     osc.frequency.setValueAtTime(freq, ac.currentTime);
     gain.gain.setValueAtTime(vol, ac.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
-    osc.start(ac.currentTime);
-    osc.stop(ac.currentTime + duration);
+    osc.start(ac.currentTime); osc.stop(ac.currentTime + duration);
   } catch(e) {}
 }
-
-// 倒數音效（低沉 beep）
 function playCountBeep(n) {
   if (n === 0) {
-    // GO！— 上升音
     playBeep(440, 0.08, 'square', 0.3);
     setTimeout(() => playBeep(660, 0.08, 'square', 0.3), 80);
     setTimeout(() => playBeep(880, 0.2,  'square', 0.4), 160);
   } else {
-    // 倒數 tick
     playBeep(220, 0.15, 'square', 0.25);
   }
 }
-
-// 開始按鈕音效
 function playStartClick() {
   playBeep(330, 0.06, 'square', 0.2);
   setTimeout(() => playBeep(440, 0.1, 'square', 0.25), 60);
@@ -125,23 +147,25 @@ const countdownEl = document.getElementById('countdownOverlay');
 function showCountdown(n) {
   if (!countdownEl) return;
   countdownEl.style.display = 'flex';
-
+  const numEl = countdownEl.querySelector('.cd-num');
   if (n === 0) {
-    countdownEl.querySelector('.cd-num').textContent = 'GO!';
-    countdownEl.querySelector('.cd-num').style.color = '#00ff88';
-    countdownEl.querySelector('.cd-num').style.textShadow = '0 0 60px rgba(0,255,136,0.8)';
+    numEl.textContent = 'GO!';
+    numEl.style.color      = '#00ff88';
+    numEl.style.textShadow = '0 0 60px rgba(0,255,136,0.8)';
     setTimeout(() => { countdownEl.style.display = 'none'; }, 600);
   } else {
-    countdownEl.querySelector('.cd-num').textContent = n;
-    countdownEl.querySelector('.cd-num').style.color = '#ffb800';
-    countdownEl.querySelector('.cd-num').style.textShadow = '0 0 60px rgba(255,184,0,0.8)';
-    // 每次數字更新觸發動畫
-    const el = countdownEl.querySelector('.cd-num');
-    el.style.animation = 'none';
-    el.offsetHeight; // reflow
-    el.style.animation = 'cdPop 0.5s ease';
+    numEl.textContent = n;
+    numEl.style.color      = '#ffb800';
+    numEl.style.textShadow = '0 0 60px rgba(255,184,0,0.8)';
+    numEl.style.animation  = 'none';
+    numEl.offsetHeight;
+    numEl.style.animation  = 'cdPop 0.5s ease';
   }
 }
+
+// ══════════════════════════════════════════
+//  WebSocket 訊息
+// ══════════════════════════════════════════
 function onMessage(event) {
   let msg;
   try { msg = JSON.parse(event.data); } catch { return; }
@@ -149,16 +173,17 @@ function onMessage(event) {
   if (msg.type === 'welcome') {
     myId       = msg.id;
     myNickname = msg.nickname || myNickname;
-    GRID_W     = msg.gridWidth  || 40;
-    GRID_H     = msg.gridHeight || 30;
-    canvas.width  = GRID_W * CELL;
-    canvas.height = GRID_H * CELL;
 
-    // 切換到遊戲畫面
+    // 手機給較小的格數，PC 給完整格數
+    GRID_W = IS_MOBILE ? 25 : (msg.gridWidth  || 40);
+    GRID_H = IS_MOBILE ? 20 : (msg.gridHeight || 30);
+
     joined = true;
     document.getElementById('lobby').style.display = 'none';
     document.getElementById('game').style.display  = 'flex';
     document.getElementById('myBadge').textContent = '🐍 ' + myNickname;
+
+    resizeCanvas();
   }
 
   if (msg.type === 'countdown') {
@@ -170,6 +195,7 @@ function onMessage(event) {
     gameState = msg;
     render(msg);
     updateUI(msg);
+    if (IS_MOBILE) updateMobScorebar(msg);
   }
 }
 
@@ -181,7 +207,6 @@ document.getElementById('startBtn').addEventListener('click', () => {
   playStartClick();
   ws.send(JSON.stringify({ type: 'start' }));
 });
-
 document.getElementById('restartBtn').addEventListener('click', () => {
   if (!ws) return;
   playStartClick();
@@ -189,36 +214,66 @@ document.getElementById('restartBtn').addEventListener('click', () => {
 });
 
 // ══════════════════════════════════════════
-//  鍵盤控制
+//  PC 鍵盤控制
 // ══════════════════════════════════════════
 const keyMap = {
-  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-  w: 'up', s: 'down', a: 'left', d: 'right',
-  W: 'up', S: 'down', A: 'left', D: 'right',
+  ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
+  w:'up', s:'down', a:'left', d:'right',
+  W:'up', S:'down', A:'left', D:'right',
 };
-
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
   const dir = keyMap[e.key];
-  if (dir && ws) {
-    e.preventDefault();
-    ws.send(JSON.stringify({ type: 'move', direction: dir }));
-  }
+  if (dir && ws) { e.preventDefault(); sendDir(dir); }
 });
 
-// ── 手機滑動 ──
-let touchStart = null;
-canvas.addEventListener('touchstart', e => { touchStart = e.touches[0]; }, { passive: true });
+// ══════════════════════════════════════════
+//  手機控制：D-Pad 按鈕 + 滑動手勢
+// ══════════════════════════════════════════
+function sendDir(dir) {
+  ws && ws.send(JSON.stringify({ type: 'move', direction: dir }));
+}
+
+// D-Pad（防止滾頁、支援長按連發）
+let dpadTimer = null;
+document.querySelectorAll('.dpad-btn').forEach(btn => {
+  const dir = btn.dataset.dir;
+
+  const press = () => {
+    btn.classList.add('pressed');
+    sendDir(dir);
+    dpadTimer = setInterval(() => sendDir(dir), 120);
+  };
+  const release = () => {
+    btn.classList.remove('pressed');
+    clearInterval(dpadTimer);
+  };
+
+  btn.addEventListener('touchstart', e => { e.preventDefault(); press(); },   { passive: false });
+  btn.addEventListener('touchend',   e => { e.preventDefault(); release(); }, { passive: false });
+  btn.addEventListener('mousedown',  press);
+  btn.addEventListener('mouseup',    release);
+  btn.addEventListener('mouseleave', release);
+});
+
+// 滑動手勢（canvas 上）
+let swipeStart = null;
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  swipeStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: false });
+
 canvas.addEventListener('touchend', e => {
-  if (!touchStart || !ws) return;
-  const dx = e.changedTouches[0].clientX - touchStart.clientX;
-  const dy = e.changedTouches[0].clientY - touchStart.clientY;
+  if (!swipeStart) return;
+  const dx = e.changedTouches[0].clientX - swipeStart.x;
+  const dy = e.changedTouches[0].clientY - swipeStart.y;
+  if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return; // 太短不算
   const dir = Math.abs(dx) > Math.abs(dy)
     ? (dx > 0 ? 'right' : 'left')
     : (dy > 0 ? 'down'  : 'up');
-  ws.send(JSON.stringify({ type: 'move', direction: dir }));
-  touchStart = null;
-}, { passive: true });
+  sendDir(dir);
+  swipeStart = null;
+}, { passive: false });
 
 // ══════════════════════════════════════════
 //  渲染
@@ -245,10 +300,8 @@ function render(state) {
     ctx.shadowColor = food.type === 'special' ? '#FFD700' : food.color;
     ctx.shadowBlur  = food.type === 'special' ? 14 : 6;
     ctx.fillStyle   = food.color;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI*2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur  = 0;
   });
 
   // 蛇
@@ -262,7 +315,6 @@ function render(state) {
       const w = CELL - 2;
       const h = CELL - 2;
       const alpha = snake.alive ? (1 - i / snake.body.length * 0.45) : 0.2;
-
       ctx.globalAlpha = alpha;
 
       if (i === 0) {
@@ -274,46 +326,45 @@ function render(state) {
         ctx.shadowBlur = 0;
       }
 
-      roundRect(ctx, x, y, w, h, 3);
+      roundRect(ctx, x, y, w, h, Math.max(2, CELL * 0.2));
       ctx.fill();
 
-      // 眼睛
-      if (i === 0 && snake.alive) {
+      // 眼睛（格子夠大才畫）
+      if (i === 0 && snake.alive && CELL >= 10) {
         ctx.shadowBlur  = 0;
         ctx.globalAlpha = 1;
         const ex = seg.x * CELL + CELL/2;
         const ey = seg.y * CELL + CELL/2;
+        const er = Math.max(1, CELL * 0.13);
         ctx.fillStyle = '#000';
-        ctx.beginPath(); ctx.arc(ex-3, ey-2, 2, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(ex+3, ey-2, 2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex - er*2, ey - er, er, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex + er*2, ey - er, er, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(ex-2.3, ey-2.5, 0.8, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(ex+3.7, ey-2.5, 0.8, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex - er*1.5, ey - er*1.4, er*0.5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex + er*2.5, ey - er*1.4, er*0.5, 0, Math.PI*2); ctx.fill();
       }
     });
 
     ctx.globalAlpha = 1;
     ctx.shadowBlur  = 0;
 
-    // 名字標籤
-    if (snake.body.length && snake.alive) {
+    // 名字標籤（只在 PC 或格子夠大時顯示）
+    if (!IS_MOBILE && snake.body.length && snake.alive && CELL >= 14) {
       const head = snake.body[0];
       const name = (state.nicknames && state.nicknames[pid]) || pid.slice(0, 8);
-      ctx.font      = `${isMe ? 'bold ' : ''}10px sans-serif`;
+      ctx.font      = `${isMe ? 'bold ' : ''}${Math.max(9, CELL*0.6)}px sans-serif`;
       ctx.fillStyle = snake.color;
       ctx.textAlign = 'center';
       ctx.globalAlpha = isMe ? 1 : 0.8;
-      ctx.fillText(name, head.x*CELL + CELL/2, head.y*CELL - 3);
+      ctx.fillText(name, head.x*CELL + CELL/2, head.y*CELL - 2);
       ctx.globalAlpha = 1;
-      ctx.textAlign = 'left';
+      ctx.textAlign   = 'left';
     }
   });
 
   // Overlay
   const overlay = document.getElementById('overlay');
-  if (overlay) {
-    overlay.style.display = state.running ? 'none' : 'flex';
-  }
+  if (overlay) overlay.style.display = state.running ? 'none' : 'flex';
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -340,58 +391,71 @@ function adjustColor(hex, amount) {
 //  UI 更新
 // ══════════════════════════════════════════
 function updateUI(state) {
-  const count = Object.keys(state.snakes || {}).length;
   const el = document.getElementById('playerCount');
-  if (el) el.textContent = count;
+  if (el) el.textContent = Object.keys(state.snakes || {}).length;
 
-  const gid = document.getElementById('gameId');
-  if (gid) gid.textContent = state.gameId || '-';
+  if (IS_MOBILE) return; // 手機用 scorebar 取代
 
-  // 排行榜
+  // PC 排行榜
   const sb = document.getElementById('scoreboard');
   if (sb) {
     const rows = Object.entries(state.snakes || {})
       .map(([pid, s]) => ({
-        pid,
-        name : (state.nicknames && state.nicknames[pid]) || pid.slice(0,8),
-        score: s.score || 0,
-        alive: s.alive,
-        color: s.color,
-        isMe : pid === myId,
+        name: (state.nicknames && state.nicknames[pid]) || pid.slice(0,8),
+        score: s.score || 0, alive: s.alive, color: s.color, isMe: pid === myId,
       }))
       .sort((a,b) => b.score - a.score);
 
     sb.innerHTML = rows.map((r, i) => `
-      <div style="display:flex;align-items:center;gap:7px;opacity:${r.alive?1:0.35}">
-        <span style="color:#333;font-size:11px;width:14px">${i+1}</span>
-        <span style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0"></span>
+      <div style="display:flex;align-items:center;gap:7px;padding:5px 0;
+                  border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;
+                  opacity:${r.alive?1:0.35}">
+        <span style="color:#333;width:12px;font-size:10px">${i+1}</span>
+        <span style="width:7px;height:7px;border-radius:50%;background:${r.color};flex-shrink:0"></span>
         <span style="flex:1;font-weight:${r.isMe?700:400};color:${r.isMe?r.color:'#e0e0f0'}">${escHtml(r.name)}</span>
         <span style="font-weight:700;color:${r.color}">${r.score}</span>
         <span>${r.alive?'':'💀'}</span>
-      </div>
-    `).join('');
+      </div>`).join('');
   }
 
-  // 玩家列表
+  // PC 玩家列表
   const pl = document.getElementById('playerList');
   if (pl) {
     pl.innerHTML = Object.entries(state.snakes || {}).map(([pid, s]) => {
-      const name = (state.nicknames && state.nicknames[pid]) || pid.slice(0,8);
-      const isMe = pid === myId;
-      return `<div style="display:flex;align-items:center;gap:6px;">
+      const name  = (state.nicknames && state.nicknames[pid]) || pid.slice(0,8);
+      const isMe  = pid === myId;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.05)">
         <span style="width:7px;height:7px;border-radius:50%;background:${s.color}"></span>
-        <span style="color:${isMe?s.color:'#e0e0f0'};font-weight:${isMe?700:400}">${escHtml(name)}${isMe?' ◀':''}</span>
-        <span style="margin-left:auto">${s.alive?'':'💀'}</span>
+        <span style="flex:1;color:${isMe?s.color:'#e0e0f0'};font-weight:${isMe?700:400}">${escHtml(name)}${isMe?' ◀':''}</span>
+        <span>${s.alive?'':'💀'}</span>
       </div>`;
     }).join('');
   }
 }
 
+// 手機分數條（底部滾動條）
+function updateMobScorebar(state) {
+  const bar = document.getElementById('mob-scorebar');
+  if (!bar) return;
+  const rows = Object.entries(state.snakes || {})
+    .map(([pid, s]) => ({
+      name: (state.nicknames && state.nicknames[pid]) || pid.slice(0,8),
+      score: s.score || 0, alive: s.alive, color: s.color, isMe: pid === myId,
+    }))
+    .sort((a,b) => b.score - a.score);
+
+  bar.innerHTML = rows.map((r, i) =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:14px;opacity:${r.alive?1:0.4}">
+      <span style="width:7px;height:7px;border-radius:50%;background:${r.color};flex-shrink:0"></span>
+      <span style="font-weight:${r.isMe?700:400};color:${r.isMe?r.color:'#e0e0f0'}">${escHtml(r.name)}</span>
+      <span style="color:${r.color};font-weight:700">${r.score}</span>
+      ${r.alive?'':'<span>💀</span>'}
+    </span>`
+  ).join('');
+}
+
 function escHtml(s) {
-  return String(s)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // 初始畫面
