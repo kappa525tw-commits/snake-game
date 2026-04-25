@@ -157,9 +157,32 @@
   #scoreboard div, #playerList div { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; }
   #scoreboard div:last-child, #playerList div:last-child { border-bottom: none; }
   .ctrl-help { font-size: 11px; color: #4a6058; line-height: 2.2; }
-  kbd {
-    background: #1a1a2e; border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 3px; padding: 1px 6px; font-size: 10px; color: #e0e0f0;
+  /* 倒數 overlay */
+  #countdownOverlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(10,10,20,0.75);
+    align-items: center; justify-content: center;
+    border-radius: 6px;
+    backdrop-filter: blur(3px);
+    z-index: 50;
+    pointer-events: none;
+  }
+  .cd-num {
+    font-size: 160px;
+    font-weight: 900;
+    font-family: 'Segoe UI', sans-serif;
+    color: #ffb800;
+    line-height: 1;
+    text-shadow: 0 0 60px rgba(255,184,0,0.8);
+    animation: cdPop 0.5s ease;
+    user-select: none;
+  }
+  @keyframes cdPop {
+    0%   { transform: scale(1.8); opacity: 0; }
+    40%  { transform: scale(0.9); opacity: 1; }
+    70%  { transform: scale(1.05); }
+    100% { transform: scale(1); }
   }
 </style>
 </head>
@@ -209,6 +232,10 @@
   <div class="game-body">
     <div class="canvas-wrap">
       <canvas id="gameCanvas"></canvas>
+      <!-- 倒數 Overlay -->
+      <div id="countdownOverlay">
+        <div class="cd-num">5</div>
+      </div>
       <div id="overlay">
         <h2>準備開始！</h2>
         <p>按「開始遊戲」或等待房主</p>
