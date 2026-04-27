@@ -24,31 +24,39 @@ except Exception as e:
 
 top_history_cache = []
 local_high_scores: Dict[str, int] = {}
+local_nicknames: Dict[str, str] = {}
 
 async def fetch_top_history():
     global top_history_cache
     if not redis_client:
         sorted_scores = sorted(local_high_scores.items(), key=lambda x: x[1], reverse=True)[:10]
-        top_history_cache = [{"nickname": k, "score": v} for k, v in sorted_scores]
+        top_history_cache = [{"nickname": local_nicknames.get(k, k), "score": v} for k, v in sorted_scores]
         return
     try:
         res = await redis_client.zrevrange("snake_top_scores", 0, 9, withscores=True)
-        top_history_cache = [{"nickname": k, "score": int(v)} for k, v in res]
+        if not res:
+            top_history_cache = []
+            return
+        pids = [k for k, v in res]
+        names = await redis_client.hmget("snake_nicknames", pids)
+        top_history_cache = [{"nickname": n if n else p, "score": int(s)} for (p, s), n in zip(res, names)]
     except Exception as e:
         print(f"Redis fetch error: {e}")
 
-async def update_top_history(nickname: str, score: int):
+async def update_top_history(player_id: str, nickname: str, score: int):
     if score <= 0: return
     if not redis_client:
-        current = local_high_scores.get(nickname, 0)
+        local_nicknames[player_id] = nickname
+        current = local_high_scores.get(player_id, 0)
         if score > current:
-            local_high_scores[nickname] = score
+            local_high_scores[player_id] = score
         await fetch_top_history()
         return
     try:
-        current = await redis_client.zscore("snake_top_scores", nickname)
+        await redis_client.hset("snake_nicknames", player_id, nickname)
+        current = await redis_client.zscore("snake_top_scores", player_id)
         if current is None or score > float(current):
-            await redis_client.zadd("snake_top_scores", {nickname: score})
+            await redis_client.zadd("snake_top_scores", {player_id: score})
         await fetch_top_history()
     except Exception as e:
         print(f"Redis update error: {e}")
@@ -294,7 +302,8 @@ async def game_loop():
             was_alive = snake["alive"]
             move_snake(snake)
             if was_alive and not snake["alive"]:
-                asyncio.create_task(update_top_history(nicknames.get(snake["player_id"], snake["player_id"]), snake["score"]))
+                pid = snake["player_id"]
+                asyncio.create_task(update_top_history(pid, nicknames.get(pid, pid), snake["score"]))
 
         await broadcast_game_state()
 
