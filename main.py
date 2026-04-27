@@ -13,6 +13,35 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List
+import redis.asyncio as redis_async
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+try:
+    redis_client = redis_async.from_url(REDIS_URL, decode_responses=True)
+except Exception as e:
+    redis_client = None
+    print(f"Redis initialization error: {e}")
+
+top_history_cache = []
+
+async def fetch_top_history():
+    global top_history_cache
+    if not redis_client: return
+    try:
+        res = await redis_client.zrevrange("snake_top_scores", 0, 9, withscores=True)
+        top_history_cache = [{"nickname": k, "score": int(v)} for k, v in res]
+    except Exception as e:
+        print(f"Redis fetch error: {e}")
+
+async def update_top_history(nickname: str, score: int):
+    if score <= 0 or not redis_client: return
+    try:
+        current = await redis_client.zscore("snake_top_scores", nickname)
+        if current is None or score > float(current):
+            await redis_client.zadd("snake_top_scores", {nickname: score})
+        await fetch_top_history()
+    except Exception as e:
+        print(f"Redis update error: {e}")
 
 app = FastAPI()
 
@@ -39,8 +68,8 @@ connected_clients: Dict[str, WebSocket] = {}
 # ══════════════════════════════════════════
 #  遊戲參數
 # ══════════════════════════════════════════
-GRID_W = 40
-GRID_H = 30
+GRID_W = 200
+GRID_H = 150
 TICK_RATE = 0.12  # 120ms per tick
 
 COLORS = [
@@ -54,6 +83,7 @@ COLORS = [
 # ══════════════════════════════════════════
 @app.on_event("startup")
 async def startup_event():
+    asyncio.create_task(fetch_top_history())
     asyncio.create_task(game_loop())
 
 # ══════════════════════════════════════════
@@ -229,6 +259,7 @@ async def broadcast_game_state():
         "nicknames": nicknames,
         "running": game_running,
         "timestamp": int(datetime.now().timestamp() * 1000),
+        "top_history": top_history_cache,
     }
 
     msg = json.dumps(state)
@@ -250,7 +281,10 @@ async def game_loop():
             continue
 
         for snake in list(snakes.values()):
+            was_alive = snake["alive"]
             move_snake(snake)
+            if was_alive and not snake["alive"]:
+                asyncio.create_task(update_top_history(nicknames.get(snake["player_id"], snake["player_id"]), snake["score"]))
 
         await broadcast_game_state()
 
