@@ -1,10 +1,8 @@
 services:
   - type: web
     name: snake-game
-    env: docker
+    env: python
     region: oregon
     plan: free
-    dockerfilePath: Dockerfile
-    buildCommand: docker build -t snake-game .
-    startCommand: docker run -p 10000:10000 snake-game
-    healthCheckPath: /
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
