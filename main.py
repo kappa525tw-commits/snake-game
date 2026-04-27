@@ -23,10 +23,14 @@ except Exception as e:
     print(f"Redis initialization error: {e}")
 
 top_history_cache = []
+local_high_scores: Dict[str, int] = {}
 
 async def fetch_top_history():
     global top_history_cache
-    if not redis_client: return
+    if not redis_client:
+        sorted_scores = sorted(local_high_scores.items(), key=lambda x: x[1], reverse=True)[:10]
+        top_history_cache = [{"nickname": k, "score": v} for k, v in sorted_scores]
+        return
     try:
         res = await redis_client.zrevrange("snake_top_scores", 0, 9, withscores=True)
         top_history_cache = [{"nickname": k, "score": int(v)} for k, v in res]
@@ -34,7 +38,13 @@ async def fetch_top_history():
         print(f"Redis fetch error: {e}")
 
 async def update_top_history(nickname: str, score: int):
-    if score <= 0 or not redis_client: return
+    if score <= 0: return
+    if not redis_client:
+        current = local_high_scores.get(nickname, 0)
+        if score > current:
+            local_high_scores[nickname] = score
+        await fetch_top_history()
+        return
     try:
         current = await redis_client.zscore("snake_top_scores", nickname)
         if current is None or score > float(current):
@@ -68,8 +78,8 @@ connected_clients: Dict[str, WebSocket] = {}
 # ══════════════════════════════════════════
 #  遊戲參數
 # ══════════════════════════════════════════
-GRID_W = 200
-GRID_H = 150
+GRID_W = 100
+GRID_H = 75
 TICK_RATE = 0.12  # 120ms per tick
 
 COLORS = [
@@ -288,9 +298,19 @@ async def game_loop():
 
         await broadcast_game_state()
 
-        # 所有蛇都死了
+        # 判斷遊戲結束條件
         alive = [s for s in snakes.values() if s["alive"]]
-        if not alive and snakes:
+        total_players = len(snakes)
+        
+        game_over = False
+        if total_players >= 2:
+            if len(alive) <= 1:
+                game_over = True
+        else:
+            if not alive and total_players > 0:
+                game_over = True
+                
+        if game_over:
             game_running = False
             await broadcast_game_state()
 
@@ -313,7 +333,7 @@ async def websocket_endpoint(websocket: WebSocket):
     # 如果是第一個玩家，初始化遊戲
     if len(snakes) == 1:
         foods.clear()
-        spawn_food(6)
+        spawn_food(18)
         game_id += 1
 
     # 發送歡迎訊息
@@ -351,7 +371,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         s.update(new_snake)
                         scores[pid] = 0
                     foods.clear()
-                    spawn_food(6)
+                    spawn_food(18)
                     game_id += 1
                     # 廣播倒數開始
                     asyncio.create_task(run_countdown())
