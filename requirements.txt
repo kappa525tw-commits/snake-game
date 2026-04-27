@@ -1,7 +1,6 @@
 fastapi
-uvicorn
+uvicorn[standard]
 websockets
 python-dotenv
 aiofiles
 redis
-
