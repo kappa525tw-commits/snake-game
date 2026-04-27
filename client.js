@@ -281,6 +281,7 @@ canvas.addEventListener('touchend', e => {
 // ══════════════════════════════════════════
 //  渲染
 // ══════════════════════════════════════════
+function render(state) {
   let offsetX = 0;
   let offsetY = 0;
   if (myId && state.snakes && state.snakes[myId]) {
