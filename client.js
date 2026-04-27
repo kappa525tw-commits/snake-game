@@ -13,8 +13,8 @@ if (IS_MOBILE) document.body.classList.add('is-mobile');
 const canvas = document.getElementById('gameCanvas');
 const ctx    = canvas.getContext('2d');
 
-let GRID_W = 200;
-let GRID_H = 150;
+let GRID_W = 100;
+let GRID_H = 75;
 let VIEW_W = 40;
 let VIEW_H = 30;
 let CELL   = 18;
@@ -300,20 +300,19 @@ function render(state) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // 格線
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-  ctx.lineWidth = 0.5;
   const startX = Math.max(0, Math.floor(offsetX));
   const endX   = Math.min(GRID_W, Math.ceil(offsetX + VIEW_W));
   const startY = Math.max(0, Math.floor(offsetY));
   const endY   = Math.min(GRID_H, Math.ceil(offsetY + VIEW_H));
 
   for (let x = startX; x <= endX; x++) {
-    const drawX = (x - offsetX) * CELL;
-    ctx.beginPath(); ctx.moveTo(drawX, 0); ctx.lineTo(drawX, canvas.height); ctx.stroke();
-  }
-  for (let y = startY; y <= endY; y++) {
-    const drawY = (y - offsetY) * CELL;
-    ctx.beginPath(); ctx.moveTo(0, drawY); ctx.lineTo(canvas.width, drawY); ctx.stroke();
+    for (let y = startY; y <= endY; y++) {
+      if ((x + y) % 2 === 0) {
+        ctx.fillStyle = '#1e1e36'; // 稍亮的格子
+        // 加上 0.5 防止出現渲染縫隙
+        ctx.fillRect((x - offsetX) * CELL, (y - offsetY) * CELL, CELL + 0.5, CELL + 0.5);
+      }
+    }
   }
 
   // 食物
