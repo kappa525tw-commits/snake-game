@@ -13,8 +13,10 @@ if (IS_MOBILE) document.body.classList.add('is-mobile');
 const canvas = document.getElementById('gameCanvas');
 const ctx    = canvas.getContext('2d');
 
-let GRID_W = 30;   // 手機格子數較少，PC 為 40（welcome 後會更新）
-let GRID_H = 22;
+let GRID_W = 200;
+let GRID_H = 150;
+let VIEW_W = 40;
+let VIEW_H = 30;
 let CELL   = 18;
 
 // ── 狀態 ──
@@ -38,8 +40,8 @@ function resizeCanvas() {
     const availW  = window.innerWidth;
     const availH  = window.innerHeight - headerH - dpadH - scoreH - 4;
 
-    const cellByW = Math.floor(availW / GRID_W);
-    const cellByH = Math.floor(availH / GRID_H);
+    const cellByW = Math.floor(availW / VIEW_W);
+    const cellByH = Math.floor(availH / VIEW_H);
     CELL = Math.max(8, Math.min(cellByW, cellByH));
   } else {
     // PC：扣掉 header + side panel + padding
@@ -49,13 +51,13 @@ function resizeCanvas() {
     const availW  = window.innerWidth  - sideW - pad;
     const availH  = window.innerHeight - headerH - pad;
 
-    const cellByW = Math.floor(availW / GRID_W);
-    const cellByH = Math.floor(availH / GRID_H);
+    const cellByW = Math.floor(availW / VIEW_W);
+    const cellByH = Math.floor(availH / VIEW_H);
     CELL = Math.max(10, Math.min(cellByW, cellByH));
   }
 
-  canvas.width  = GRID_W * CELL;
-  canvas.height = GRID_H * CELL;
+  canvas.width  = VIEW_W * CELL;
+  canvas.height = VIEW_H * CELL;
   if (gameState) render(gameState);
 }
 
@@ -174,9 +176,10 @@ function onMessage(event) {
     myId       = msg.id;
     myNickname = msg.nickname || myNickname;
 
-    // 手機給較小的格數，PC 給完整格數
-    GRID_W = IS_MOBILE ? 25 : (msg.gridWidth  || 40);
-    GRID_H = IS_MOBILE ? 20 : (msg.gridHeight || 30);
+    VIEW_W = IS_MOBILE ? 25 : 40;
+    VIEW_H = IS_MOBILE ? 20 : 30;
+    GRID_W = msg.gridWidth  || 200;
+    GRID_H = msg.gridHeight || 150;
 
     joined = true;
     document.getElementById('lobby').style.display = 'none';
@@ -278,24 +281,47 @@ canvas.addEventListener('touchend', e => {
 // ══════════════════════════════════════════
 //  渲染
 // ══════════════════════════════════════════
-function render(state) {
+  let offsetX = 0;
+  let offsetY = 0;
+  if (myId && state.snakes && state.snakes[myId]) {
+    const mySnake = state.snakes[myId];
+    if (mySnake.body && mySnake.body.length > 0) {
+      offsetX = mySnake.body[0].x - VIEW_W / 2;
+      offsetY = mySnake.body[0].y - VIEW_H / 2;
+    }
+  }
+
+  // 限制 offsetX/offsetY 在地圖邊界內
+  offsetX = Math.max(0, Math.min(offsetX, GRID_W - VIEW_W));
+  offsetY = Math.max(0, Math.min(offsetY, GRID_H - VIEW_H));
+
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // 格線
   ctx.strokeStyle = 'rgba(255,255,255,0.04)';
   ctx.lineWidth = 0.5;
-  for (let x = 0; x <= GRID_W; x++) {
-    ctx.beginPath(); ctx.moveTo(x*CELL, 0); ctx.lineTo(x*CELL, canvas.height); ctx.stroke();
+  const startX = Math.max(0, Math.floor(offsetX));
+  const endX   = Math.min(GRID_W, Math.ceil(offsetX + VIEW_W));
+  const startY = Math.max(0, Math.floor(offsetY));
+  const endY   = Math.min(GRID_H, Math.ceil(offsetY + VIEW_H));
+
+  for (let x = startX; x <= endX; x++) {
+    const drawX = (x - offsetX) * CELL;
+    ctx.beginPath(); ctx.moveTo(drawX, 0); ctx.lineTo(drawX, canvas.height); ctx.stroke();
   }
-  for (let y = 0; y <= GRID_H; y++) {
-    ctx.beginPath(); ctx.moveTo(0, y*CELL); ctx.lineTo(canvas.width, y*CELL); ctx.stroke();
+  for (let y = startY; y <= endY; y++) {
+    const drawY = (y - offsetY) * CELL;
+    ctx.beginPath(); ctx.moveTo(0, drawY); ctx.lineTo(canvas.width, drawY); ctx.stroke();
   }
 
   // 食物
   (state.foods || []).forEach(food => {
-    const cx = food.x * CELL + CELL/2;
-    const cy = food.y * CELL + CELL/2;
+    if (food.x < offsetX - 1 || food.x > offsetX + VIEW_W + 1 ||
+        food.y < offsetY - 1 || food.y > offsetY + VIEW_H + 1) return;
+
+    const cx = (food.x - offsetX) * CELL + CELL/2;
+    const cy = (food.y - offsetY) * CELL + CELL/2;
     const r  = food.type === 'special' ? CELL*0.42 : CELL*0.32;
     ctx.shadowColor = food.type === 'special' ? '#FFD700' : food.color;
     ctx.shadowBlur  = food.type === 'special' ? 14 : 6;
@@ -310,8 +336,11 @@ function render(state) {
     const isMe = pid === myId;
 
     snake.body.forEach((seg, i) => {
-      const x = seg.x * CELL + 1;
-      const y = seg.y * CELL + 1;
+      if (seg.x < offsetX - 1 || seg.x > offsetX + VIEW_W + 1 ||
+          seg.y < offsetY - 1 || seg.y > offsetY + VIEW_H + 1) return;
+
+      const x = (seg.x - offsetX) * CELL + 1;
+      const y = (seg.y - offsetY) * CELL + 1;
       const w = CELL - 2;
       const h = CELL - 2;
       const alpha = snake.alive ? (1 - i / snake.body.length * 0.45) : 0.2;
@@ -333,8 +362,8 @@ function render(state) {
       if (i === 0 && snake.alive && CELL >= 10) {
         ctx.shadowBlur  = 0;
         ctx.globalAlpha = 1;
-        const ex = seg.x * CELL + CELL/2;
-        const ey = seg.y * CELL + CELL/2;
+        const ex = (seg.x - offsetX) * CELL + CELL/2;
+        const ey = (seg.y - offsetY) * CELL + CELL/2;
         const er = Math.max(1, CELL * 0.13);
         ctx.fillStyle = '#000';
         ctx.beginPath(); ctx.arc(ex - er*2, ey - er, er, 0, Math.PI*2); ctx.fill();
@@ -356,7 +385,7 @@ function render(state) {
       ctx.fillStyle = snake.color;
       ctx.textAlign = 'center';
       ctx.globalAlpha = isMe ? 1 : 0.8;
-      ctx.fillText(name, head.x*CELL + CELL/2, head.y*CELL - 2);
+      ctx.fillText(name, (head.x - offsetX)*CELL + CELL/2, (head.y - offsetY)*CELL - 2);
       ctx.globalAlpha = 1;
       ctx.textAlign   = 'left';
     }
@@ -430,6 +459,18 @@ function updateUI(state) {
         <span>${s.alive?'':'💀'}</span>
       </div>`;
     }).join('');
+  }
+
+  // 歷史排行榜
+  const hb = document.getElementById('historyBoard');
+  if (hb && state.top_history) {
+    hb.innerHTML = state.top_history.map((r, i) => `
+      <div style="display:flex;align-items:center;gap:7px;padding:5px 0;
+                  border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;">
+        <span style="color:#ffb800;width:12px;font-size:10px">${i+1}</span>
+        <span style="flex:1;color:#e0e0f0">${escHtml(r.nickname)}</span>
+        <span style="font-weight:700;color:#00ff88">${r.score}</span>
+      </div>`).join('');
   }
 }
 
